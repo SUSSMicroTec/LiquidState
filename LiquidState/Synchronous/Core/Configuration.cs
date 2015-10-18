@@ -1,12 +1,11 @@
 ﻿// Author: Prasanna V. Loganathar
-// Created: 2:12 AM 27-11-2014
+// Created: 04:16 11-05-2015
 // Project: LiquidState
 // License: http://www.apache.org/licenses/LICENSE-2.0
 
 using System;
 using System.Collections.Generic;
 using System.Diagnostics.Contracts;
-using System.Linq;
 using LiquidState.Core;
 
 namespace LiquidState.Synchronous.Core
@@ -17,7 +16,8 @@ namespace LiquidState.Synchronous.Core
 
         internal Configuration(int statesConfigStoreInitalCapacity = 4)
         {
-            Representations = new Dictionary<TState, StateRepresentation<TState, TTrigger>>(statesConfigStoreInitalCapacity);
+            Representations =
+                new Dictionary<TState, StateRepresentation<TState, TTrigger>>(statesConfigStoreInitalCapacity);
         }
 
         internal Configuration(Dictionary<TState, StateRepresentation<TState, TTrigger>> representations)
@@ -25,16 +25,15 @@ namespace LiquidState.Synchronous.Core
             Representations = representations;
         }
 
-        public StateConfigurationHelper<TState, TTrigger> ForState(TState state)
+        public StateConfiguration<TState, TTrigger> ForState(TState state)
         {
-            Contract.Requires<ArgumentNullException>(state != null);
-
-            return new StateConfigurationHelper<TState, TTrigger>(Representations, state);
+            return new StateConfiguration<TState, TTrigger>(Representations, state);
         }
 
         public ParameterizedTrigger<TTrigger, TArgument> SetTriggerParameter<TArgument>(TTrigger trigger)
         {
-            Contract.Requires<ArgumentNullException>(trigger != null);
+            Contract.Requires<ArgumentNullException>(trigger != null, nameof(trigger));
+
             return new ParameterizedTrigger<TTrigger, TArgument>(trigger);
         }
     }

@@ -1,54 +1,45 @@
 ﻿// Author: Prasanna V. Loganathar
-// Created: 3:31 PM 07-12-2014
+// Created: 09:55 16-07-2015
 // Project: LiquidState
 // License: http://www.apache.org/licenses/LICENSE-2.0
 
 using System;
 using System.Collections.Generic;
-using System.Diagnostics.Contracts;
 
 namespace LiquidState.Awaitable.Core
 {
-    internal class StateRepresentation<TState, TTrigger>
+    internal class AwaitableStateRepresentation<TState, TTrigger>
     {
         public readonly TState State;
-        public readonly List<TriggerRepresentation<TTrigger, TState>> Triggers;
+        public readonly List<AwaitableTriggerRepresentation<TTrigger>> Triggers;
         public object OnEntryAction;
         public object OnExitAction;
-        public TransitionFlag TransitionFlags;
+        public AwaitableTransitionFlag AwaitableTransitionFlags;
 
-        internal StateRepresentation(TState state)
+        internal AwaitableStateRepresentation(TState state)
         {
-            Contract.Requires(state != null);
-
-            Contract.Ensures(State != null);
-            Contract.Ensures(Triggers != null);
-
             State = state;
             // Allocate with capacity as 1 to avoid wastage of memory.
-            Triggers = new List<TriggerRepresentation<TTrigger, TState>>(1);
+            Triggers = new List<AwaitableTriggerRepresentation<TTrigger>>(1);
         }
     }
 
-    internal class TriggerRepresentation<TTrigger, TState>
+    internal class AwaitableTriggerRepresentation<TTrigger>
     {
         public readonly TTrigger Trigger;
         public object ConditionalTriggerPredicate;
-        public object NextStateRepresentationPredicate;
+        public object NextStateRepresentationWrapper;
         public object OnTriggerAction;
-        public TransitionFlag TransitionFlags;
+        public AwaitableTransitionFlag AwaitableTransitionFlags;
 
-        internal TriggerRepresentation(TTrigger trigger)
+        internal AwaitableTriggerRepresentation(TTrigger trigger)
         {
-            Contract.Requires(trigger != null);
-            Contract.Ensures(Trigger != null);
-
             Trigger = trigger;
         }
     }
 
     [Flags]
-    internal enum TransitionFlag
+    internal enum AwaitableTransitionFlag
     {
         None = 0,
         EntryReturnsTask = 1,

@@ -1,46 +1,35 @@
-﻿using System.Collections.Generic;
-using System.Diagnostics.Contracts;
-using LiquidState.Common;
+﻿// Author: Prasanna V. Loganathar
+// Created: 09:55 16-07-2015
+// Project: LiquidState
+// License: http://www.apache.org/licenses/LICENSE-2.0
+
+using System;
+using System.Collections.Generic;
 using LiquidState.Core;
 using LiquidState.Synchronous.Core;
 
 namespace LiquidState.Synchronous
 {
-    public abstract class RawStateMachineBase<TState, TTrigger> : AbstractStateMachineCore<TState, TTrigger>, IStateMachine<TState, TTrigger>
+    public abstract class RawStateMachineBase<TState, TTrigger> : AbstractStateMachineCore<TState, TTrigger>,
+        IStateMachine<TState, TTrigger>
     {
         internal StateRepresentation<TState, TTrigger> CurrentStateRepresentation;
         internal Dictionary<TState, StateRepresentation<TState, TTrigger>> Representations;
-
-        public override TState CurrentState
-        {
-            get { return CurrentStateRepresentation.State; }
-        }
-
-        public override IEnumerable<TTrigger> CurrentPermittedTriggers
-        {
-            get
-            {
-                foreach (var triggerRepresentation in CurrentStateRepresentation.Triggers)
-                {
-                    yield return triggerRepresentation.Trigger;
-                }
-            }
-        }
+        private readonly RawStateMachineDiagnostics<TState, TTrigger> diagnostics;
 
         protected RawStateMachineBase(TState initialState, Configuration<TState, TTrigger> configuration)
         {
-            Contract.Requires(configuration != null);
-            Contract.Requires(initialState != null);
-
             Representations = configuration.Representations;
 
-            CurrentStateRepresentation = StateConfigurationHelper<TState, TTrigger>.FindStateRepresentation(
+            CurrentStateRepresentation = StateConfigurationHelper.FindStateRepresentation(
                 initialState, Representations);
 
             if (CurrentStateRepresentation == null)
             {
-                InvalidStateException<TState>.Throw(initialState);
+                ExceptionHelper.ThrowInvalidState(initialState);
             }
+
+            diagnostics = new RawStateMachineDiagnostics<TState, TTrigger>(this);
         }
 
         public virtual void MoveToState(TState state, StateTransitionOption option = StateTransitionOption.Default)
@@ -61,6 +50,36 @@ namespace LiquidState.Synchronous
             if (!IsEnabled) return;
             ExecutionHelper.FireCore(trigger, this);
         }
+
+        public IStateMachineDiagnostics<TState, TTrigger> Diagnostics => diagnostics;
+        public override TState CurrentState => CurrentStateRepresentation.State;
+    }
+
+    public class RawStateMachineDiagnostics<TState, TTrigger> : IStateMachineDiagnostics<TState, TTrigger>
+    {
+        private readonly RawStateMachineBase<TState, TTrigger> machine;
+
+        public RawStateMachineDiagnostics(RawStateMachineBase<TState, TTrigger> machine)
+        {
+            this.machine = machine;
+        }
+
+        public bool CanHandleTrigger(TTrigger trigger, bool exactMatch = false)
+        {
+            return DiagnosticsHelper.CanHandleTrigger(trigger, machine, exactMatch);
+        }
+
+        public bool CanHandleTrigger(TTrigger trigger, Type argumentType)
+        {
+            return DiagnosticsHelper.CanHandleTrigger(trigger, machine, argumentType);
+        }
+
+        public bool CanHandleTrigger<TArgument>(TTrigger trigger)
+        {
+            return DiagnosticsHelper.CanHandleTrigger<TState, TTrigger, TArgument>(trigger, machine);
+        }
+
+        public IEnumerable<TTrigger> CurrentPermittedTriggers => DiagnosticsHelper.EnumeratePermittedTriggers(machine);
     }
 
     public sealed class RawStateMachine<TState, TTrigger> : RawStateMachineBase<TState, TTrigger>
@@ -68,8 +87,6 @@ namespace LiquidState.Synchronous
         public RawStateMachine(TState initialState, Configuration<TState, TTrigger> configuration)
             : base(initialState, configuration)
         {
-            Contract.Requires(configuration != null);
-            Contract.Requires(initialState != null);
         }
     }
 }

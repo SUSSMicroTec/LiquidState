@@ -1,9 +1,8 @@
 ﻿// Author: Prasanna V. Loganathar
-// Created: 2:12 AM 27-11-2014
+// Created: 02:20 12-05-2015
 // Project: LiquidState
 // License: http://www.apache.org/licenses/LICENSE-2.0
 
-using System.Diagnostics.Contracts;
 using System.Threading.Tasks;
 using LiquidState.Awaitable.Core;
 using LiquidState.Common;
@@ -11,15 +10,15 @@ using LiquidState.Core;
 
 namespace LiquidState.Awaitable
 {
-    public abstract class GuardedStateMachineBase<TState, TTrigger> : RawStateMachineBase<TState, TTrigger>
+    public abstract class GuardedAwaitableStateMachineBase<TState, TTrigger> :
+        RawAwaitableStateMachineBase<TState, TTrigger>
     {
         private InterlockedMonitor monitor = new InterlockedMonitor();
 
-        protected GuardedStateMachineBase(TState initialState, Configuration<TState, TTrigger> configuration)
-            : base(initialState, configuration)
+        protected GuardedAwaitableStateMachineBase(TState initialState,
+            AwaitableConfiguration<TState, TTrigger> awaitableConfiguration)
+            : base(initialState, awaitableConfiguration)
         {
-            Contract.Requires(configuration != null);
-            Contract.Requires(initialState != null);
         }
 
         public override async Task MoveToStateAsync(TState state,
@@ -39,7 +38,7 @@ namespace LiquidState.Awaitable
             else
             {
                 if (IsEnabled)
-                    ExecutionHelper.ThrowInTransition();
+                    AwaitableExecutionHelper.ThrowInTransition();
             }
         }
 
@@ -60,7 +59,7 @@ namespace LiquidState.Awaitable
             else
             {
                 if (IsEnabled)
-                    ExecutionHelper.ThrowInTransition();
+                    AwaitableExecutionHelper.ThrowInTransition();
             }
         }
 
@@ -80,18 +79,18 @@ namespace LiquidState.Awaitable
             else
             {
                 if (IsEnabled)
-                    ExecutionHelper.ThrowInTransition();
+                    AwaitableExecutionHelper.ThrowInTransition();
             }
         }
     }
 
-    public sealed class GuardedStateMachine<TState, TTrigger> : GuardedStateMachineBase<TState, TTrigger>
+    public sealed class GuardedAwaitableStateMachine<TState, TTrigger> :
+        GuardedAwaitableStateMachineBase<TState, TTrigger>
     {
-        public GuardedStateMachine(TState initialState, Configuration<TState, TTrigger> configuration)
-            : base(initialState, configuration)
+        public GuardedAwaitableStateMachine(TState initialState,
+            AwaitableConfiguration<TState, TTrigger> awaitableConfiguration)
+            : base(initialState, awaitableConfiguration)
         {
-            Contract.Requires(configuration != null);
-            Contract.Requires(initialState != null);
         }
     }
 }

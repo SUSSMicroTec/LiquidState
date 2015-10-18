@@ -5,7 +5,6 @@
 
 using System;
 using System.Diagnostics;
-using System.Text;
 using System.Threading.Tasks;
 
 namespace LiquidState.Sample
@@ -44,10 +43,10 @@ namespace LiquidState.Sample
                 .OnEntry(() => Console.WriteLine("OnEntry of Talking"))
                 .OnExit(() => Console.WriteLine("OnExit of Talking"))
                 .Permit(Trigger.TurnOff, State.Off, () => { Console.WriteLine("Turning off"); })
-                .Permit(Trigger.Ring, State.Ringing, () => { Console.WriteLine("Attempting to ring"); });
+                .PermitDynamic(Trigger.Ring, () => DynamicState.Create(State.Ringing),
+                    () => { Console.WriteLine("Attempting to ring"); });
 
             var machine = StateMachineFactory.Create(State.Ringing, config);
-
 
             machine.Fire(Trigger.Talk);
             machine.Fire(Trigger.Ring);
@@ -85,12 +84,14 @@ namespace LiquidState.Sample
                 .OnEntry(async () => Console.WriteLine("OnEntry of Talking"))
                 .OnExit(async () => Console.WriteLine("OnExit of Talking"))
                 .Permit(Trigger.TurnOff, State.Off, async () => { Console.WriteLine("Turning off"); })
-                .Permit(Trigger.Ring, State.Ringing, async () => { Console.WriteLine("Attempting to ring"); });
+                .PermitDynamic(Trigger.Ring, () => DynamicState.Create(State.Ringing),
+                    async () => { Console.WriteLine("Attempting to ring"); });
 
-            var machine = StateMachineFactory.Create(State.Ringing, config, asyncMachine: false);
+            var machine = StateMachineFactory.Create(State.Ringing, config, queued: false);
 
             machine.FireAsync(Trigger.Talk).Wait();
             machine.FireAsync(Trigger.Ring).Wait();
+            machine.FireAsync(Trigger.Talk).Wait();
         }
 
         public static async Task LiquidStateAsyncTest()
@@ -130,7 +131,7 @@ namespace LiquidState.Sample
                 .PermitReentry(Trigger.Talk);
 
 
-            var machine = StateMachineFactory.Create(State.Ringing, config, asyncMachine: true);
+            var machine = StateMachineFactory.Create(State.Ringing, config, queued: true);
 
             var sw = Stopwatch.StartNew();
 

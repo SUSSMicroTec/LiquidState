@@ -1,7 +1,9 @@
+// Author: Prasanna V. Loganathar
+// Created: 09:55 16-07-2015
+// Project: LiquidState
+// License: http://www.apache.org/licenses/LICENSE-2.0
+
 using System;
-using System.Diagnostics.Contracts;
-using System.Collections.Generic;
-using LiquidState.Common;
 using LiquidState.Core;
 
 namespace LiquidState.Synchronous.Core
@@ -10,46 +12,32 @@ namespace LiquidState.Synchronous.Core
     {
         internal static void ThrowInTransition()
         {
-            throw new InvalidOperationException("State cannot be changed while already in transition. Tip: Use an asynchronous state machine such as QueuedStateMachine that has these parallel semantics for these to work out of the box.");
+            throw new InvalidOperationException(
+                "State cannot be changed while already in transition. Tip: Use an asynchronous state machine such as QueuedStateMachine that has these parallel semantics for these to work out of the box.");
         }
 
-        internal static bool CheckFlag(TransitionFlag source, TransitionFlag flagToCheck)
+        internal static void MoveToStateCore<TState, TTrigger>(TState state, StateTransitionOption option,
+            RawStateMachineBase<TState, TTrigger> machine, bool ignoreInvalidStates = false)
         {
-            return (source & flagToCheck) == flagToCheck;
-        }
-
-        internal static void ExecuteAction(Action action)
-        {
-            if (action != null) action.Invoke();
-        }
-
-        internal static StateRepresentation<TState, TTrigger> FindStateRepresentation<TState, TTrigger>(TState initialState, Dictionary<TState, StateRepresentation<TState, TTrigger>> representations)
-        {
-            StateRepresentation<TState, TTrigger> rep;
-            return representations.TryGetValue(initialState, out rep) ? rep : null;
-        }
-
-        internal static void MoveToStateCore<TState, TTrigger>(TState state, StateTransitionOption option, RawStateMachineBase<TState, TTrigger> machine)
-        {
-
-            Contract.Requires(machine != null);
-
             StateRepresentation<TState, TTrigger> targetRep;
             if (machine.Representations.TryGetValue(state, out targetRep))
             {
-
                 var currentRep = machine.CurrentStateRepresentation;
+
+
                 machine.RaiseTransitionStarted(targetRep.State);
+
+                var transition = new Transition<TState, TTrigger>(currentRep.State, state);
 
                 if ((option & StateTransitionOption.CurrentStateExitTransition) ==
                     StateTransitionOption.CurrentStateExitTransition)
                 {
-                    ExecuteAction(currentRep.OnExitAction);
+                    currentRep.OnExitAction?.Invoke(transition);
                 }
                 if ((option & StateTransitionOption.NewStateEntryTransition) ==
                     StateTransitionOption.NewStateEntryTransition)
                 {
-                    ExecuteAction(targetRep.OnEntryAction);
+                    targetRep.OnEntryAction?.Invoke(transition);
                 }
 
                 var pastState = currentRep.State;
@@ -58,95 +46,78 @@ namespace LiquidState.Synchronous.Core
             }
             else
             {
-               machine.RaiseInvalidState(state);
+                if (!ignoreInvalidStates)
+                    machine.RaiseInvalidState(state);
             }
         }
 
-        internal static TriggerRepresentation<TTrigger, TState> FindAndEvaluateTriggerRepresentation<TState, TTrigger>(TTrigger trigger, RawStateMachineBase<TState, TTrigger> machine)
+        internal static void FireCore<TState, TTrigger>(TTrigger trigger, RawStateMachineBase<TState, TTrigger> machine,
+            bool raiseInvalidStateOrTrigger = true)
         {
-            Contract.Requires(machine != null);
-
-            var triggerRep = StateConfigurationHelper<TState, TTrigger>.FindTriggerRepresentation(trigger,
-                machine.CurrentStateRepresentation);
-
-            if (triggerRep == null)
-            {
-                machine.RaiseInvalidTrigger(trigger);
-                return null;
-            }
-
-
-            var predicate = triggerRep.ConditionalTriggerPredicate;
-            if (predicate != null)
-            {
-                if (!predicate())
-                {
-                    machine.RaiseInvalidTrigger(trigger);
-                    return null;
-                }
-            }
-
-            // Handle ignored trigger
-
-            if (triggerRep.NextStateRepresentationPredicate == null)
-            {
-                return null;
-            }
-
-            return triggerRep;
-        }
-
-        internal static void FireCore<TState, TTrigger>(TTrigger trigger, RawStateMachineBase<TState, TTrigger> machine)
-        {
-            Contract.Requires(machine != null);
-
             var currentStateRepresentation = machine.CurrentStateRepresentation;
-            var triggerRep = FindAndEvaluateTriggerRepresentation(trigger, machine);
+
+
+            var triggerRep = DiagnosticsHelper.FindAndEvaluateTriggerRepresentation(trigger, machine,
+                raiseInvalidStateOrTrigger);
+
             if (triggerRep == null)
                 return;
 
-            // Catch invalid paramters before execution.
+            // Catch invalid parameters before execution.
 
-            Action triggerAction = null;
+            Action<Transition<TState, TTrigger>> triggerAction = null;
             try
             {
-                triggerAction = (Action)triggerRep.OnTriggerAction;
+                triggerAction = (Action<Transition<TState, TTrigger>>)triggerRep.OnTriggerAction;
             }
             catch (InvalidCastException)
             {
-                machine.RaiseInvalidTrigger(trigger);
+                if (raiseInvalidStateOrTrigger)
+                    machine.RaiseInvalidTrigger(trigger);
+
+                return;
             }
 
             StateRepresentation<TState, TTrigger> nextStateRep = null;
 
-            if (CheckFlag(triggerRep.TransitionFlags,
+            if (StateConfigurationHelper.CheckFlag(triggerRep.TransitionFlags,
                 TransitionFlag.DynamicState))
             {
-                var state = ((Func<TState>) triggerRep.NextStateRepresentationPredicate)();
-                nextStateRep = FindStateRepresentation(state, machine.Representations);
+                var dynamicState = ((Func<DynamicState<TState>>)triggerRep.NextStateRepresentationWrapper)();
+                if (!dynamicState.CanTransition)
+                    return;
+
+                var state = dynamicState.ResultingState;
+                nextStateRep = StateConfigurationHelper.FindStateRepresentation(state,
+                    machine.Representations);
+
                 if (nextStateRep == null)
                 {
-                    machine.RaiseInvalidState(state);
+                    if (raiseInvalidStateOrTrigger)
+                        machine.RaiseInvalidState(state);
                     return;
                 }
             }
             else
             {
-                nextStateRep = (StateRepresentation<TState, TTrigger>) triggerRep.NextStateRepresentationPredicate;
+                nextStateRep = (StateRepresentation<TState, TTrigger>)triggerRep.NextStateRepresentationWrapper;
             }
+
+
+            var transition = new Transition<TState, TTrigger>(currentStateRepresentation.State, nextStateRep.State);
 
             machine.RaiseTransitionStarted(nextStateRep.State);
 
             // Current exit
             var currentExit = currentStateRepresentation.OnExitAction;
-            ExecuteAction(currentExit);
+            currentExit?.Invoke(transition);
 
             // Trigger entry
-            ExecuteAction(triggerAction);
+            triggerAction?.Invoke(transition);
 
             // Next entry
             var nextEntry = nextStateRep.OnEntryAction;
-            ExecuteAction(nextEntry);
+            nextEntry?.Invoke(transition);
 
             var pastState = machine.CurrentState;
             machine.CurrentStateRepresentation = nextStateRep;
@@ -154,60 +125,73 @@ namespace LiquidState.Synchronous.Core
         }
 
         internal static void FireCore<TState, TTrigger, TArgument>(
-            ParameterizedTrigger<TTrigger, TArgument> parameterizedTrigger, TArgument argument, RawStateMachineBase<TState, TTrigger> machine)
+            ParameterizedTrigger<TTrigger, TArgument> parameterizedTrigger, TArgument argument,
+            RawStateMachineBase<TState, TTrigger> machine, bool raiseInvalidStateOrTrigger = true)
         {
-            Contract.Requires(machine != null);
-
             var currentStateRepresentation = machine.CurrentStateRepresentation;
+
+
             var trigger = parameterizedTrigger.Trigger;
 
-            var triggerRep = FindAndEvaluateTriggerRepresentation(trigger, machine);
+            var triggerRep = DiagnosticsHelper.FindAndEvaluateTriggerRepresentation(trigger, machine,
+                raiseInvalidStateOrTrigger);
             if (triggerRep == null)
                 return;
 
             // Catch invalid parameters before execution.
 
-            Action<TArgument> triggerAction = null;
+            Action<Transition<TState, TTrigger>, TArgument> triggerAction = null;
             try
             {
-                triggerAction = (Action<TArgument>)triggerRep.OnTriggerAction;
+                triggerAction = (Action<Transition<TState, TTrigger>, TArgument>)triggerRep.OnTriggerAction;
             }
             catch (InvalidCastException)
             {
-                machine.RaiseInvalidTrigger(trigger);
+                if (raiseInvalidStateOrTrigger)
+                    machine.RaiseInvalidTrigger(trigger);
+                return;
             }
 
             StateRepresentation<TState, TTrigger> nextStateRep = null;
 
-            if (CheckFlag(triggerRep.TransitionFlags,
+            if (StateConfigurationHelper.CheckFlag(triggerRep.TransitionFlags,
                 TransitionFlag.DynamicState))
             {
-                var state = ((Func<TState>)triggerRep.NextStateRepresentationPredicate)();
-                nextStateRep = FindStateRepresentation(state, machine.Representations);
+                var dynamicState = ((Func<DynamicState<TState>>)triggerRep.NextStateRepresentationWrapper)();
+                if (!dynamicState.CanTransition)
+                    return;
+
+                var state = dynamicState.ResultingState;
+                nextStateRep = StateConfigurationHelper.FindStateRepresentation(state,
+                    machine.Representations);
+
                 if (nextStateRep == null)
                 {
-                    machine.RaiseInvalidState(state);
+                    if (raiseInvalidStateOrTrigger)
+                        machine.RaiseInvalidState(state);
                     return;
                 }
             }
             else
             {
-                nextStateRep = (StateRepresentation<TState, TTrigger>)triggerRep.NextStateRepresentationPredicate;
-            } 
-            
+                nextStateRep = (StateRepresentation<TState, TTrigger>)triggerRep.NextStateRepresentationWrapper;
+            }
+
+
+            var transition = new Transition<TState, TTrigger>(currentStateRepresentation.State, nextStateRep.State);
+
             machine.RaiseTransitionStarted(nextStateRep.State);
 
             // Current exit
             var currentExit = currentStateRepresentation.OnExitAction;
-            ExecuteAction(currentExit);
+            currentExit?.Invoke(transition);
 
             // Trigger entry
-            if (triggerAction != null) triggerAction.Invoke(argument);
-
+            triggerAction?.Invoke(transition, argument);
 
             // Next entry
             var nextEntry = nextStateRep.OnEntryAction;
-            ExecuteAction(nextEntry);
+            nextEntry?.Invoke(transition);
 
             var pastState = machine.CurrentState;
             machine.CurrentStateRepresentation = nextStateRep;

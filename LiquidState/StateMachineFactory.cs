@@ -1,5 +1,5 @@
 ﻿// Author: Prasanna V. Loganathar
-// Created: 2:11 AM 27-11-2014
+// Created: 02:11 27-11-2014
 // Project: LiquidState
 // License: http://www.apache.org/licenses/LICENSE-2.0
 
@@ -7,95 +7,174 @@ using System;
 using System.Diagnostics.Contracts;
 using System.Threading.Tasks;
 using LiquidState.Awaitable;
+using LiquidState.Awaitable.Core;
 using LiquidState.Core;
 using LiquidState.Synchronous;
+using LiquidState.Synchronous.Core;
 
 namespace LiquidState
 {
     public static class StateMachineFactory
     {
-        public static Synchronous.Core.IStateMachine<TState, TTrigger> Create<TState, TTrigger>(TState initialState,
-            Synchronous.Core.Configuration<TState, TTrigger> config, bool blocking = false,
+        #region Core Methods
+
+        public static Configuration<TState, TTrigger> CreateConfiguration<TState, TTrigger>()
+        {
+            return new Configuration<TState, TTrigger>();
+        }
+
+        public static AwaitableConfiguration<TState, TTrigger> CreateAwaitableConfiguration
+            <TState, TTrigger>()
+        {
+            return new AwaitableConfiguration<TState, TTrigger>();
+        }
+
+        private static IStateMachine<TState, TTrigger> CreateCore<TState, TTrigger, TOptions>(TOptions options,
+            Func<TOptions, IStateMachine<TState, TTrigger>> stateMachineFunc,
             bool throwOnInvalidTriggers = true, bool throwOnInvalidState = true)
         {
-            Contract.Requires<ArgumentNullException>(initialState != null);
-            Contract.Requires<ArgumentNullException>(config != null);
+            var sm = stateMachineFunc(options);
+            if (sm == null) throw new InvalidOperationException("State machine must be initializable");
 
-            Synchronous.Core.IStateMachine<TState, TTrigger> sm;
+            Configure(sm, throwOnInvalidTriggers, throwOnInvalidState);
+            return sm;
+        }
+
+        private static IAwaitableStateMachine<TState, TTrigger> CreateCore<TState, TTrigger, TOptions>(TOptions options,
+            Func<TOptions, IAwaitableStateMachine<TState, TTrigger>> stateMachineFunc,
+            bool throwOnInvalidTriggers = true, bool throwOnInvalidState = true)
+        {
+            var sm = stateMachineFunc(options);
+            if (sm == null) throw new InvalidOperationException("State machine must be initializable");
+
+            Configure(sm, throwOnInvalidTriggers, throwOnInvalidState);
+            return sm;
+        }
+
+        #endregion
+
+
+        public static IStateMachine<TState, TTrigger> Create<TState, TTrigger>(TState initialState,
+            Configuration<TState, TTrigger> config, bool blocking = false,
+            bool throwOnInvalidTriggers = true, bool throwOnInvalidState = true)
+        {
+            Contract.Requires<ArgumentNullException>(config != null, nameof(config));
+
+            return CreateCore<TState, TTrigger, object>(null, _ => CreateDefault(initialState, config, blocking),
+                throwOnInvalidTriggers,
+                throwOnInvalidState);
+        }
+
+        public static IStateMachine<TState, TTrigger> Create<TState, TTrigger>(
+            Func<IStateMachine<TState, TTrigger>> stateMachineFunc,
+            bool throwOnInvalidTriggers = true, bool throwOnInvalidState = true)
+        {
+            Contract.Requires<ArgumentNullException>(stateMachineFunc != null, nameof(stateMachineFunc));
+
+            return CreateCore<TState, TTrigger, object>(null, _ => stateMachineFunc(), throwOnInvalidTriggers,
+                throwOnInvalidState);
+        }
+
+        public static IStateMachine<TState, TTrigger> Create<TState, TTrigger, TOptions>(TOptions options,
+            Func<TOptions, IStateMachine<TState, TTrigger>> stateMachineFunc,
+            bool throwOnInvalidTriggers = true, bool throwOnInvalidState = true)
+        {
+            Contract.Requires<ArgumentNullException>(stateMachineFunc != null, nameof(stateMachineFunc));
+
+            return CreateCore(options, stateMachineFunc, throwOnInvalidTriggers, throwOnInvalidState);
+        }
+
+
+        public static IAwaitableStateMachine<TState, TTrigger> Create<TState, TTrigger>(
+            TState initialState, AwaitableConfiguration<TState, TTrigger> config, bool queued = true,
+            bool throwOnInvalidTriggers = true, bool throwOnInvalidState = true)
+        {
+            Contract.Requires<ArgumentNullException>(config != null, nameof(config));
+
+            return CreateCore<TState, TTrigger, object>(null, _ => CreateDefault(initialState, config, queued, null),
+                throwOnInvalidTriggers,
+                throwOnInvalidState);
+        }
+
+        public static IAwaitableStateMachine<TState, TTrigger> Create<TState, TTrigger>(
+            TState initialState, AwaitableConfiguration<TState, TTrigger> config, TaskScheduler scheduler,
+            bool throwOnInvalidTriggers = true, bool throwOnInvalidState = true)
+        {
+            Contract.Requires<ArgumentNullException>(config != null, nameof(config));
+            Contract.Requires<ArgumentNullException>(scheduler != null, nameof(scheduler));
+
+            return CreateCore<TState, TTrigger, object>(null, _ => CreateDefault(initialState, config, false, scheduler),
+                throwOnInvalidTriggers,
+                throwOnInvalidState);
+        }
+
+        public static IAwaitableStateMachine<TState, TTrigger> Create<TState, TTrigger>(
+            Func<IAwaitableStateMachine<TState, TTrigger>> stateMachineFunc,
+            bool throwOnInvalidTriggers = true, bool throwOnInvalidState = true)
+        {
+            Contract.Requires<ArgumentNullException>(stateMachineFunc != null, nameof(stateMachineFunc));
+
+            return CreateCore<TState, TTrigger, object>(null, _ => stateMachineFunc(), throwOnInvalidTriggers,
+                throwOnInvalidState);
+        }
+
+        public static IAwaitableStateMachine<TState, TTrigger> Create<TState, TTrigger, TOptions>(TOptions options,
+            Func<TOptions, IAwaitableStateMachine<TState, TTrigger>> stateMachineFunc,
+            bool throwOnInvalidTriggers = true, bool throwOnInvalidState = true)
+        {
+            Contract.Requires<ArgumentNullException>(stateMachineFunc != null, nameof(stateMachineFunc));
+
+            return CreateCore(options, stateMachineFunc, throwOnInvalidTriggers, throwOnInvalidState);
+        }
+
+        #region Default Helpers
+
+        private static IStateMachine<TState, TTrigger> CreateDefault<TState, TTrigger>(TState initialState,
+            Configuration<TState, TTrigger> config, bool blocking = false)
+        {
+            IStateMachine<TState, TTrigger> sm;
             if (blocking)
             {
                 sm = new BlockingStateMachine<TState, TTrigger>(initialState, config);
             }
             else
             {
-                sm = new Synchronous.GuardedStateMachine<TState, TTrigger>(initialState, config);
+                sm = new GuardedStateMachine<TState, TTrigger>(initialState, config);
             }
-
-            if (throwOnInvalidTriggers)
-                sm.UnhandledTrigger += InvalidTriggerException<TTrigger, TState>.Throw;
-
-            if (throwOnInvalidState)
-                sm.InvalidState += InvalidStateException<TState>.Throw;
 
             return sm;
         }
 
-        public static Awaitable.Core.IStateMachine<TState, TTrigger> Create<TState, TTrigger>(
-            TState initialState, Awaitable.Core.Configuration<TState, TTrigger> config, bool queued = true,
-            bool throwOnInvalidTriggers = true, bool throwOnInvalidState = true)
+        private static IAwaitableStateMachine<TState, TTrigger> CreateDefault<TState, TTrigger>(
+            TState initialState,
+            AwaitableConfiguration<TState, TTrigger> config, bool queued, TaskScheduler scheduler)
         {
-            Contract.Requires<ArgumentNullException>(initialState != null);
-            Contract.Requires<ArgumentNullException>(config != null);
-
-            return Create(initialState, config, queued, null, throwOnInvalidTriggers, throwOnInvalidState);
-        }
-
-        public static Awaitable.Core.IStateMachine<TState, TTrigger> Create<TState, TTrigger>(
-            TState initialState, Awaitable.Core.Configuration<TState, TTrigger> config, TaskScheduler customScheduler,
-            bool throwOnInvalidTriggers = true, bool throwOnInvalidState = true)
-        {
-            Contract.Requires<ArgumentNullException>(initialState != null);
-            Contract.Requires<ArgumentNullException>(config != null);
-            Contract.Requires<ArgumentNullException>(customScheduler != null);
-
-            return Create(initialState, config, false, null, throwOnInvalidTriggers, throwOnInvalidState);
-        }
-
-        public static Synchronous.Core.Configuration<TState, TTrigger> CreateConfiguration<TState, TTrigger>()
-        {
-            return new Synchronous.Core.Configuration<TState, TTrigger>();
-        }
-
-        public static Awaitable.Core.Configuration<TState, TTrigger> CreateAwaitableConfiguration
-            <TState, TTrigger>()
-        {
-            return new Awaitable.Core.Configuration<TState, TTrigger>();
-        }
-
-        private static Awaitable.Core.IStateMachine<TState, TTrigger> Create<TState, TTrigger>(TState initialState,
-            Awaitable.Core.Configuration<TState, TTrigger> config, bool queued, TaskScheduler scheduler,
-            bool throwOnInvalidTriggers, bool throwOnInvalidState = true)
-        {
-            Awaitable.Core.IStateMachine<TState, TTrigger> sm;
+            IAwaitableStateMachine<TState, TTrigger> sm;
             if (queued)
             {
-                sm = new QueuedStateMachine<TState, TTrigger>(initialState, config);
+                sm = new QueuedAwaitableStateMachine<TState, TTrigger>(initialState, config);
             }
             else
             {
                 sm = scheduler == null
-                    ? (Awaitable.Core.IStateMachine<TState, TTrigger>)
-                        new Awaitable.GuardedStateMachine<TState, TTrigger>(initialState, config)
-                    : new ScheduledStateMachine<TState, TTrigger>(initialState, config, scheduler);
+                    ? (IAwaitableStateMachine<TState, TTrigger>)
+                        new GuardedAwaitableStateMachine<TState, TTrigger>(initialState, config)
+                    : new ScheduledAwaitableStateMachine<TState, TTrigger>(initialState, config, scheduler);
             }
-
-            if (throwOnInvalidTriggers)
-                sm.UnhandledTrigger += InvalidTriggerException<TTrigger, TState>.Throw;
-
-            if (throwOnInvalidState)
-                sm.InvalidState += InvalidStateException<TState>.Throw;
 
             return sm;
         }
+
+        private static void Configure<TState, TTrigger>(IStateMachineCore<TState, TTrigger> stateMachine,
+            bool throwOnInvalidTriggers = true, bool throwOnInvalidState = true)
+        {
+            if (throwOnInvalidTriggers)
+                stateMachine.UnhandledTrigger += ExceptionHelper.ThrowInvalidTrigger;
+
+            if (throwOnInvalidState)
+                stateMachine.InvalidState += ExceptionHelper.ThrowInvalidState;
+        }
+
+        #endregion
     }
 }

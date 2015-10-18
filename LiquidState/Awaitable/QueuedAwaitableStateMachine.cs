@@ -1,14 +1,10 @@
 ﻿// Author: Prasanna V. Loganathar
-// Created: 1:30 AM 05-12-2014
+// Created: 09:55 16-07-2015
 // Project: LiquidState
 // License: http://www.apache.org/licenses/LICENSE-2.0
 
 using System;
-using System.Collections.Generic;
-using System.Diagnostics.Contracts;
-using System.Runtime.CompilerServices;
-using System.Runtime.Serialization;
-using System.Threading;
+using System.Collections.Immutable;
 using System.Threading.Tasks;
 using LiquidState.Awaitable.Core;
 using LiquidState.Common;
@@ -16,19 +12,17 @@ using LiquidState.Core;
 
 namespace LiquidState.Awaitable
 {
-    public abstract class QueuedStateMachineBase<TState, TTrigger> : RawStateMachineBase<TState, TTrigger>
+    public abstract class QueuedAwaitableStateMachineBase<TState, TTrigger> :
+        RawAwaitableStateMachineBase<TState, TTrigger>
     {
         private IImmutableQueue<Func<Task>> actionsQueue;
         private int queueCount;
         private InterlockedBlockingMonitor queueMonitor = new InterlockedBlockingMonitor();
         private InterlockedMonitor monitor = new InterlockedMonitor();
 
-        protected QueuedStateMachineBase(TState initialState, Configuration<TState, TTrigger> config)
+        protected QueuedAwaitableStateMachineBase(TState initialState, AwaitableConfiguration<TState, TTrigger> config)
             : base(initialState, config)
         {
-            Contract.Requires(initialState != null);
-            Contract.Requires(config != null);
-
             actionsQueue = ImmutableQueue.Create<Func<Task>>();
         }
 
@@ -276,13 +270,13 @@ namespace LiquidState.Awaitable
         }
     }
 
-    public sealed class QueuedStateMachine<TState, TTrigger> : QueuedStateMachineBase<TState, TTrigger>
+    public sealed class QueuedAwaitableStateMachine<TState, TTrigger> :
+        QueuedAwaitableStateMachineBase<TState, TTrigger>
     {
-        public QueuedStateMachine(TState initialState, Configuration<TState, TTrigger> configuration)
-            : base(initialState, configuration)
+        public QueuedAwaitableStateMachine(TState initialState,
+            AwaitableConfiguration<TState, TTrigger> awaitableConfiguration)
+            : base(initialState, awaitableConfiguration)
         {
-            Contract.Requires(configuration != null);
-            Contract.Requires(initialState != null);
         }
     }
 }
