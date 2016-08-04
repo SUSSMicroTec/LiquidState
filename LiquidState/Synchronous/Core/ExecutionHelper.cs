@@ -106,7 +106,7 @@ namespace LiquidState.Synchronous.Core
 
             var transition = new Transition<TState, TTrigger>(currentStateRepresentation.State, nextStateRep.State);
 
-            machine.RaiseTransitionStarted(nextStateRep.State);
+            machine.RaiseTransitionStarted(nextStateRep.State, trigger);
 
             // Current exit
             var currentExit = currentStateRepresentation.OnExitAction;
@@ -121,7 +121,7 @@ namespace LiquidState.Synchronous.Core
 
             var pastState = machine.CurrentState;
             machine.CurrentStateRepresentation = nextStateRep;
-            machine.RaiseTransitionExecuted(pastState);
+            machine.RaiseTransitionExecuted(pastState, trigger);
         }
 
         internal static void FireCore<TState, TTrigger, TArgument>(
@@ -180,7 +180,7 @@ namespace LiquidState.Synchronous.Core
 
             var transition = new Transition<TState, TTrigger>(currentStateRepresentation.State, nextStateRep.State);
 
-            machine.RaiseTransitionStarted(nextStateRep.State);
+            machine.RaiseTransitionStarted(nextStateRep.State, trigger);
 
             // Current exit
             var currentExit = currentStateRepresentation.OnExitAction;
@@ -195,7 +195,7 @@ namespace LiquidState.Synchronous.Core
 
             var pastState = machine.CurrentState;
             machine.CurrentStateRepresentation = nextStateRep;
-            machine.RaiseTransitionExecuted(pastState);
+            machine.RaiseTransitionExecuted(pastState, trigger);
         }
     }
 }
