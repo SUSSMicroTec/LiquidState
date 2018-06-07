@@ -5,7 +5,6 @@ Efficient state machines for .NET with both synchronous and asynchronous support
 Heavily inspired by the excellent state machine library [**Stateless**](https://github.com/nblumhardt/stateless) by
 **Nicholas Blumhardt.**
 
-[![Build status](https://ci.appveyor.com/api/projects/status/6a1pmx2o3jaje60m/branch/master?svg=true)](https://ci.appveyor.com/project/prasannavl/liquidstate/branch/master)
 [![NuGet badge](https://buildstats.info/nuget/LiquidState)](https://www.nuget.org/packages/LiquidState)
 
 Installation
@@ -29,6 +28,8 @@ costs).
 - `MoveToState`, to move freely between states, without triggers.
 - `PermitDynamic` to support selection of states dynamically on-the-fly.
 - `Diagnostics` in-built to check for validity of triggers, and currently available triggers.
+
+[**Release Notes**](https://github.com/prasannavl/LiquidState/blob/master/ReleaseNotes.md)
 
 How To Use
 ---
@@ -109,108 +110,109 @@ Examples
 A synchronous machine example:
 
 ```c#
-var config = StateMachineFactory.CreateConfiguration<State, Trigger>();
+    var config = StateMachineFactory.CreateConfiguration<State, Trigger>();
 
-config.ForState(State.Off)
-    .OnEntry(() => Console.WriteLine("OnEntry of Off"))
-    .OnExit(() => Console.WriteLine("OnExit of Off"))
-    .PermitReentry(Trigger.TurnOn)
-    .Permit(Trigger.Ring, State.Ringing,
-            () => { Console.WriteLine("Attempting to ring"); })
-    .Permit(Trigger.Connect, State.Connected,
-            () => { Console.WriteLine("Connecting"); });
+    config.ForState(State.Off)
+        .OnEntry(() => Console.WriteLine("OnEntry of Off"))
+        .OnExit(() => Console.WriteLine("OnExit of Off"))
+        .PermitReentry(Trigger.TurnOn)
+        .Permit(Trigger.Ring, State.Ringing,
+                () => { Console.WriteLine("Attempting to ring"); })
+        .Permit(Trigger.Connect, State.Connected,
+                () => { Console.WriteLine("Connecting"); });
 
-var connectTriggerWithParameter =
-            config.SetTriggerParameter<string>(Trigger.Connect);
+    var connectTriggerWithParameter =
+                config.SetTriggerParameter<string>(Trigger.Connect);
 
-config.ForState(State.Ringing)
-    .OnEntry(() => Console.WriteLine("OnEntry of Ringing"))
-    .OnExit(() => Console.WriteLine("OnExit of Ringing"))
-    .Permit(connectTriggerWithParameter, State.Connected,
-            name => { Console.WriteLine("Attempting to connect to {0}", name); })
-    .Permit(Trigger.Talk, State.Talking,
-            () => { Console.WriteLine("Attempting to talk"); });
+    config.ForState(State.Ringing)
+        .OnEntry(() => Console.WriteLine("OnEntry of Ringing"))
+        .OnExit(() => Console.WriteLine("OnExit of Ringing"))
+        .Permit(connectTriggerWithParameter, State.Connected,
+                name => { Console.WriteLine("Attempting to connect to {0}", name); })
+        .Permit(Trigger.Talk, State.Talking,
+                () => { Console.WriteLine("Attempting to talk"); });
 
-config.ForState(State.Connected)
-    .OnEntry(() => Console.WriteLine("AOnEntry of Connected"))
-    .OnExit(() => Console.WriteLine("AOnExit of Connected"))
-    .PermitReentry(Trigger.Connect)
-    .Permit(Trigger.Talk, State.Talking,
-          () => { Console.WriteLine("Attempting to talk"); })
-    .Permit(Trigger.TurnOn, State.Off,
-          () => { Console.WriteLine("Turning off"); });
+    config.ForState(State.Connected)
+        .OnEntry(() => Console.WriteLine("AOnEntry of Connected"))
+        .OnExit(() => Console.WriteLine("AOnExit of Connected"))
+        .PermitReentry(Trigger.Connect)
+        .Permit(Trigger.Talk, State.Talking,
+            () => { Console.WriteLine("Attempting to talk"); })
+        .Permit(Trigger.TurnOn, State.Off,
+            () => { Console.WriteLine("Turning off"); });
 
 
-config.ForState(State.Talking)
-    .OnEntry(() => Console.WriteLine("OnEntry of Talking"))
-    .OnExit(() => Console.WriteLine("OnExit of Talking"))
-    .Permit(Trigger.TurnOn, State.Off,
-          () => { Console.WriteLine("Turning off"); })
-    .Permit(Trigger.Ring, State.Ringing,
-          () => { Console.WriteLine("Attempting to ring"); });
+    config.ForState(State.Talking)
+        .OnEntry(() => Console.WriteLine("OnEntry of Talking"))
+        .OnExit(() => Console.WriteLine("OnExit of Talking"))
+        .Permit(Trigger.TurnOn, State.Off,
+            () => { Console.WriteLine("Turning off"); })
+        .Permit(Trigger.Ring, State.Ringing,
+            () => { Console.WriteLine("Attempting to ring"); });
 
-var machine = StateMachineFactory.Create(State.Ringing, config);
+    var machine = StateMachineFactory.Create(State.Ringing, config);
 
-machine.Fire(Trigger.Talk);
-machine.Fire(Trigger.Ring);
-machine.Fire(connectTriggerWithParameter, "John Doe");
+    machine.Fire(Trigger.Talk);
+    machine.Fire(Trigger.Ring);
+    machine.Fire(connectTriggerWithParameter, "John Doe");
 ```
 
 Now, let's take the same dumb, and terrible example, but now do it **asynchronously**!
 (Mix and match synchronous code when you don't need asynchrony to avoid the costs.)
 
 ```c#
-// Note the "CreateAwaitableConfiguration"
-var config = StateMachineFactory.CreateAwaitableConfiguration<State, Trigger>();
+    // Note the "CreateAwaitableConfiguration"
+    var config = StateMachineFactory.CreateAwaitableConfiguration<State, Trigger>();
 
-config.ForState(State.Off)
-    .OnEntry(async () => Console.WriteLine("OnEntry of Off"))
-    .OnExit(async () => Console.WriteLine("OnExit of Off"))
-    .PermitReentry(Trigger.TurnOn)
-    .Permit(Trigger.Ring, State.Ringing,
-          async () => { Console.WriteLine("Attempting to ring"); })
-    .Permit(Trigger.Connect, State.Connected,
-          async () => { Console.WriteLine("Connecting"); });
+    config.ForState(State.Off)
+        .OnEntry(async () => Console.WriteLine("OnEntry of Off"))
+        .OnExit(async () => Console.WriteLine("OnExit of Off"))
+        .PermitReentry(Trigger.TurnOn)
+        .Permit(Trigger.Ring, State.Ringing,
+            async () => { Console.WriteLine("Attempting to ring"); })
+        .Permit(Trigger.Connect, State.Connected,
+            async () => { Console.WriteLine("Connecting"); });
 
-var connectTriggerWithParameter =
-            config.SetTriggerParameter<string>(Trigger.Connect);
+    var connectTriggerWithParameter =
+                config.SetTriggerParameter<string>(Trigger.Connect);
 
-config.ForState(State.Ringing)
-    .OnEntry(() => Console.WriteLine("OnEntry of Ringing"))
-    .OnExit(() => Console.WriteLine("OnExit of Ringing"))
-    .Permit(connectTriggerWithParameter, State.Connected,
-            name => { Console.WriteLine("Attempting to connect to {0}", name); })
-    .Permit(Trigger.Talk, State.Talking,
-            () => { Console.WriteLine("Attempting to talk"); });
+    config.ForState(State.Ringing)
+        .OnEntry(() => Console.WriteLine("OnEntry of Ringing"))
+        .OnExit(() => Console.WriteLine("OnExit of Ringing"))
+        .Permit(connectTriggerWithParameter, State.Connected,
+                name => { Console.WriteLine("Attempting to connect to {0}", name); })
+        .Permit(Trigger.Talk, State.Talking,
+                () => { Console.WriteLine("Attempting to talk"); });
 
-config.ForState(State.Connected)
-    .OnEntry(async () => Console.WriteLine("AOnEntry of Connected"))
-    .OnExit(async () => Console.WriteLine("AOnExit of Connected"))
-    .PermitReentry(Trigger.Connect)
-    .Permit(Trigger.Talk, State.Talking,
-          async () => { Console.WriteLine("Attempting to talk"); })
-    .Permit(Trigger.TurnOn, State.Off,
-          async () => { Console.WriteLine("Turning off"); });
+    config.ForState(State.Connected)
+        .OnEntry(async () => Console.WriteLine("AOnEntry of Connected"))
+        .OnExit(async () => Console.WriteLine("AOnExit of Connected"))
+        .PermitReentry(Trigger.Connect)
+        .Permit(Trigger.Talk, State.Talking,
+            async () => { Console.WriteLine("Attempting to talk"); })
+        .Permit(Trigger.TurnOn, State.Off,
+            async () => { Console.WriteLine("Turning off"); });
 
-config.ForState(State.Talking)
-    .OnEntry(() => Console.WriteLine("OnEntry of Talking"))
-    .OnExit(() => Console.WriteLine("OnExit of Talking"))
-    .Permit(Trigger.TurnOn, State.Off,
-          () => { Console.WriteLine("Turning off"); })
-    .Permit(Trigger.Ring, State.Ringing,
-          () => { Console.WriteLine("Attempting to ring"); });
+    config.ForState(State.Talking)
+        .OnEntry(() => Console.WriteLine("OnEntry of Talking"))
+        .OnExit(() => Console.WriteLine("OnExit of Talking"))
+        .Permit(Trigger.TurnOn, State.Off,
+            () => { Console.WriteLine("Turning off"); })
+        .Permit(Trigger.Ring, State.Ringing,
+            () => { Console.WriteLine("Attempting to ring"); });
 
-var machine = StateMachineFactory.Create(State.Ringing, config);
+    var machine = StateMachineFactory.Create(State.Ringing, config);
 
-await machine.FireAsync(Trigger.Talk);
-await machine.FireAsync(Trigger.Ring);
-await machine.FireAsync(connectTriggerWithParameter, "John Doe");
+    await machine.FireAsync(Trigger.Talk);
+    await machine.FireAsync(Trigger.Ring);
+    await machine.FireAsync(connectTriggerWithParameter, "John Doe");
 ```
 
 Core APIs
 ---
 
 **IStateMachineCore:**
+
 ```c#
 public interface IStateMachineCore<TState, TTrigger>
 {
@@ -227,39 +229,38 @@ public interface IStateMachineCore<TState, TTrigger>
 }
 ```
 
-
 **Synchronous:**
 
 ```c#
-    public interface IStateMachine<TState, TTrigger> 
-           : IStateMachineCore<TState, TTrigger>
-    {
-        IStateMachineDiagnostics<TState, TTrigger> Diagnostics { get; }
+public interface IStateMachine<TState, TTrigger> 
+        : IStateMachineCore<TState, TTrigger>
+{
+    IStateMachineDiagnostics<TState, TTrigger> Diagnostics { get; }
 
-        void Fire<TArgument>(
-                ParameterizedTrigger<TTrigger, TArgument> parameterizedTrigger, 
-                TArgument argument);
-        void Fire(TTrigger trigger);
-        void MoveToState(TState state, 
-                StateTransitionOption option = StateTransitionOption.Default);
-    }
+    void Fire<TArgument>(
+            ParameterizedTrigger<TTrigger, TArgument> parameterizedTrigger, 
+            TArgument argument);
+    void Fire(TTrigger trigger);
+    void MoveToState(TState state, 
+            StateTransitionOption option = StateTransitionOption.Default);
+}
 ```
 
 **Awaitable:**
 
 ```c#
-    public interface IAwaitableStateMachine<TState, TTrigger> 
-           : IStateMachineCore<TState, TTrigger>
-    {
-        IAwaitableStateMachineDiagnostics<TState, TTrigger> Diagnostics { get; }
+public interface IAwaitableStateMachine<TState, TTrigger> 
+        : IStateMachineCore<TState, TTrigger>
+{
+    IAwaitableStateMachineDiagnostics<TState, TTrigger> Diagnostics { get; }
 
-        Task FireAsync<TArgument>(
-                ParameterizedTrigger<TTrigger, TArgument> parameterizedTrigger,
-                TArgument argument);
-        Task FireAsync(TTrigger trigger);
-        Task MoveToStateAsync(TState state, 
-                StateTransitionOption option = StateTransitionOption.Default);
-    }
+    Task FireAsync<TArgument>(
+            ParameterizedTrigger<TTrigger, TArgument> parameterizedTrigger,
+            TArgument argument);
+    Task FireAsync(TTrigger trigger);
+    Task MoveToStateAsync(TState state, 
+            StateTransitionOption option = StateTransitionOption.Default);
+}
 ```
 
 In-built Machines
@@ -312,162 +313,4 @@ Contributions
 
 If this project has helped you, the best way to `say thanks` is to contribute back :)
 
-Any commits into the `master` branch will be automatically built and deployed as `pre-release` nuget packages.
-
 **Note:** If your contribution introduces new API surface, features, or includes either conceptual or implementational changes, it is **highly recommended** that an issue is opened first (which will be labelled accordingly), so that design notes or at-least a quick review on the direction is discussed, before any large effort is made. There's nothing I hate more than good contributions that go unmerged. :)
-
-
-Release Notes
----
-
-######v1.1.0
-
-- Added removable invalid trigger event handler by default
-- Added `Ignore` and `IgnoreIf` to configurations
-
-######v1.2.0
-
-- Added generic parameterized triggers
-
-######v1.3.0-beta
-
-- Added QueuedAsyncStateMachine with customizable synchronization context, and queued Fire semantics.
-
-######v.2.0.0-beta
-
-- Changed AsyncStateMachine to AwaitableStateMachine
-- Changed QueuedAsyncStateMachine to AsyncStateMachine
-- AwaitableStateMachine are logically synchronous but accepts Task and async methods and can be awaited.
-- AsyncStateMachine is fully asynchronous and dispatched onto the instantiated synchronization context, and is thread safe.
-- AsyncStateMachines are queued by default.
-- All except AsyncStateMachines will throw InvalidOperationException if attempted to Fire while a transition is in progress.
-
-######v.2.1.0-beta
-
-- Critical Fix: All the state machines never reset the IsRunning value on error or unhandled state, leading to the machine being dormant
-- More robust error handling
-- Removed StateMachine.ReConfigure. Retain the configuration, and reconfigure it any time to modify a live state machine.
-- FluidStateMachine added
-
-######v.2.1.1-beta
-
-- Improve fluid flow dynamics for FluidStateMachine
-
-######v.2.1.2-beta
-
-- Allow null states in FluidStateMachine
-- Allow zero configuration start for FluidStateMachine
-
-######v.2.1.4-beta
-
-- Remove FluidStateMachine in favor of SimpleStateMachine (not available yet)
-
-######v.2.1.5-beta
-
-- Fix: Async state machine queues attempts to execute concurrently (throwing an exception preventing it) when it enters a queue, and not awaited
-
-######v.2.1.6-beta
-
-- Remove dispatcher on AsyncStateMachine. Dispatching and synchronization be easily handled within the delegates itself, and not by the machine.
-
-######v.3.0.0-beta
-
-- Complete re-write of all the machines, with Interlocked routines. All three machines are lock-free and thread-safe.
-- Add MoveToState(TState, StateTransitionOption) to all three state machines to move freely between states.
-
-######v.3.0.1-beta
-
-- Fix: MoveToState on AsyncStateMachine was broken due to wrong internal method being called.
-
-######v.3.0.2-beta
-
-- Minor changes and fixes
-
-######v.3.0.3-beta
-
-- Cleanup release
-
-######v.3.0.4-beta
-
-- Internal implementation changes.
-- Remove Stop method from all machine, as the complexity it bring about is simply unnecessary since the functionality can easily be implemented with an additional state.
-
-######v.3.0.5
-
-- v3.0.5, is now transitioning to its own Immutable Collections, and as a side effect, it is also out of beta, and is  now fully stable.
-
-######v.3.0.6
-
-- Drop dependency on System.Collections.Immutable
-
-######v.3.1.0
-
-- Version bump, with removal of all dependencies.
-- Fix: Code contracts rewrite was missing on Release builds.
-
-######v.3.2.0
-
-- Breaking change: The configuration API has been renamed from
-  **x.Configure(TState)** to **x.ForState(TState)**
-  (Since, its only small literal change more in line with the semantics involved, the major version number has been retained)
-
-######v.3.2.1
-
-- Minor perf improvements
-- Enforce strict semantic versioning
-
-######v.4.0
-
-- Rename StateMachine to StateMachineFactory to be more approriate.
-- Add a new BlockingStateMachine for a synchronous machine that processes sequentially by blocking, enabled with a blocking parameter on creation.
-- StateMachineFactory now returns IStateMachine instead of the concrete class for synchronous state machines also.
-
-######v.4.1
-
-- Added new AwaitableStateMachineWithScheduler which is just a simple AwaitableStateMachine that accepts a TaskScheduler to directly execute them without the queuing, or thread-safety overheads.
-
-######v.4.1.1
-
-- Fix CanHandleTrigger()
-
-######v.5.0.0
-
-- Add `Task<bool> CanHandleTriggerAsync(TTrigger trigger);` to IAwaitableStateMachine
-- Make CanHandleTrigger check for predicates, if present.
-
-Breaking changes:
-
-- Removed `bool CanHandleTrigger(TTrigger trigger)` from it IAwaitableStateMachine. Has been replaced by the async version.
-
-######v6.0.1
-
-- Complete rewrite, removed a lot of code duplication, and restructured.
-
-Breaking changes: 
-
-- Everthing other than the MoveToState*, Fire* and configuration methods. 
-
-######v7.0.0
-
-- New `Diagnostics` API, for examination of current state, and possible trigger that could be handled.
-- `PermitDynamic` now takes a func that returns `DynamicState<TState>` struct, instead of `TState` - `DynamicState.Create` and `DynamicState.NoTransition` helpers can be used to easily create them. 
-- Numerous internal changes, and refactoring.
-- Bugfix: Machine continues with execution on InvalidState.
-
-Breaking changes:
-
-- `CurrentPermittedStates` moved into `Diagnostics`.
-
-######v7.2.0
-
-- Introduce `Transition<TState, TTrigger>` object
-- All state machine configurations now take the transition object. (Extensions methods act as overloads without the transition objects for convenience)
-- New factory methods to be able to create custom state machines through the factory.
-
-######v8.0
-
-- Major cleanup
-- Add proper runtime null checks on required public API surface.
-- Enable usage of `null` as a value for a reference based `TState`.
-- All internal APIs that take both `TState` and `TTrigger` as generic parameters are now consistent, and always take them in that order. Generally shouldn't be any breaking change unless you ended up using internal or obscure APIs.
-
